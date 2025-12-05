@@ -1,8 +1,5 @@
-package com.example;
-
 import java.io.*;
-import java.nio.file.*;
-import java.util.*;
+
 
 public class NotesStore {
     private static final String FILE_PATH = "data/notes.csv";
