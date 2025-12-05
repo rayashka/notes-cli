@@ -67,3 +67,13 @@ public class App {
         return params;
     }
 }
+
+case "rm":
+    String idStr = params.get("id");
+    if (idStr == null || idStr.isEmpty()) {
+        System.out.println("Ошибка: не указан ID");
+        return;
+    }
+    int id = Integer.parseInt(idStr);
+    store.removeNote(id);
+    break;
