@@ -54,16 +54,17 @@ public class NotesStore {
             return;
         }
         // Перезаписываем файл с новыми ID
-        Files.write(Paths.get(FILE_PATH), new byte[0]);
+        Files.write(Paths.get(FILE_PATH), new byte[0]); // Очистка
         for (int i = 0; i < newLines.size(); i++) {
             String[] parts = newLines.get(i).split(";", 2);
             String newLine = (i + 1) + ";" + parts[1];
             Files.write(Paths.get(FILE_PATH), (newLine + System.lineSeparator()).getBytes(), StandardOpenOption.APPEND);
-               }
+        }
         System.out.println("Заметка #" + id + " удалена");
-    } 
-    
+    }
+
     public int countNotes() throws IOException {
-        
+        List<String> lines = Files.readAllLines(Paths.get(FILE_PATH));
+        return lines.size();
     }
 }
