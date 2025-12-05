@@ -1,5 +1,8 @@
-import java.io.*;
+package com.example;
 
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
 
 public class NotesStore {
     private static final String FILE_PATH = "data/notes.csv";
@@ -51,47 +54,16 @@ public class NotesStore {
             return;
         }
         // Перезаписываем файл с новыми ID
-        Files.write(Paths.get(FILE_PATH), new byte[0]); // Очистка
+        Files.write(Paths.get(FILE_PATH), new byte[0]);
         for (int i = 0; i < newLines.size(); i++) {
             String[] parts = newLines.get(i).split(";", 2);
             String newLine = (i + 1) + ";" + parts[1];
             Files.write(Paths.get(FILE_PATH), (newLine + System.lineSeparator()).getBytes(), StandardOpenOption.APPEND);
-        }
+               }
         System.out.println("Заметка #" + id + " удалена");
-    }
-
+    } 
+    
     public int countNotes() throws IOException {
-        List<String> lines = Files.readAllLines(Paths.get(FILE_PATH));
-        return lines.size();
+        
     }
-}
-
-
-public void removeNote(int id) throws IOException {
-    List<String> lines = Files.readAllLines(Paths.get(FILE_PATH));
-    boolean found = false;
-    List<String> newLines = new ArrayList<>();
-    
-    for (String line : lines) {
-        int currentId = Integer.parseInt(line.split(";")[0]);
-        if (currentId == id) {
-            found = true;
-            continue;
-        }
-        newLines.add(line);
-    }
-    
-    if (!found) {
-        System.out.println("Not found #" + id);
-        return;
-    }
-    
-    // Перезаписываем файл с новыми ID
-    Files.write(Paths.get(FILE_PATH), new byte[0]); // Очистка
-    for (int i = 0; i < newLines.size(); i++) {
-        String[] parts = newLines.get(i).split(";", 2);
-        String newLine = (i + 1) + ";" + parts[1];
-        Files.write(Paths.get(FILE_PATH), (newLine + System.lineSeparator()).getBytes(), StandardOpenOption.APPEND);
-    }
-    System.out.println("Заметка #" + id + " удалена");
 }
