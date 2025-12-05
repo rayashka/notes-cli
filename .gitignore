@@ -1,0 +1,6 @@
+*.class
+data/notes.csv
+.vscode/
+*.iml
+*.log
+target/
