@@ -1,99 +1,129 @@
 package com.example;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.locks.ReentrantLock;
 
-public class App {
-    public static void main(String[] args) {
-        String cmd = null;
-        String text = null;
-        String idStr = null;
+public class NotesStore {
+    private final Path dataFile;
+    private final ReentrantLock lock = new ReentrantLock();
 
-        for (String arg : args) {
-            if (arg.startsWith("--cmd=")) {
-                cmd = arg.substring(6);
-            } else if (arg.startsWith("--text=")) {
-                text = arg.substring(7);
-            } else if (arg.startsWith("--id=")) {
-                idStr = arg.substring(5);
-            }
-        }
+    public NotesStore(String filePath) {
+        this.dataFile = Paths.get(filePath);
+        ensureDataDir();
+    }
 
-        String dataPath = "/app/data/notes.csv";
-        NotesStore store = new NotesStore(dataPath);
-
+    private void ensureDataDir() {
         try {
-            if (cmd == null) {
-                System.err.println("❌ Ошибка: не указана команда (--cmd=add|rm|count|list)");
-                printUsage();
-                System.exit(1);
+            Path dir = dataFile.getParent();
+            if (dir != null && !Files.exists(dir)) {
+                Files.createDirectories(dir);
             }
-
-            switch (cmd) {
-                case "add":
-                    if (text == null) {
-                        System.err.println("❌ Ошибка: для --cmd=add требуется --text=\"...\"");
-                        printUsage();
-                        System.exit(1);
-                    }
-                    long id = store.addNote(text);
-                    System.out.println("✅ Добавлена заметка #" + id);
-                    break;
-
-                case "rm":
-                    if (idStr == null) {
-                        System.err.println("❌ Ошибка: для --cmd=rm требуется --id=N");
-                        printUsage();
-                        System.exit(1);
-                    }
-                    try {
-                        long idToRemove = Long.parseLong(idStr);
-                        boolean removed = store.removeNote(idToRemove);
-                        if (removed) {
-                            System.out.println("🗑️ Заметка #" + idToRemove + " удалена");
-                        } else {
-                            System.out.println("⚠️ Заметка #" + idToRemove + " не найдена");
-                        }
-                    } catch (NumberFormatException e) {
-                        System.err.println("❌ Ошибка: --id должен быть целым числом");
-                        System.exit(1);
-                    }
-                    break;
-
-                case "count":
-                    long count = store.countNotes();
-                    System.out.println("📊 Всего заметок: " + count);
-                    break;
-
-                case "list":
-                    List<String> notes = store.listNotes();
-                    if (notes.isEmpty()) {
-                        System.out.println("📭 Нет заметок");
-                    } else {
-                        System.out.println("📋 Список заметок:");
-                        for (String note : notes) {
-                            System.out.println("  • " + note);
-                        }
-                    }
-                    break;
-
-                default:
-                    System.err.println("❌ Неизвестная команда: " + cmd);
-                    printUsage();
-                    System.exit(1);
+            if (!Files.exists(dataFile)) {
+                Files.createFile(dataFile);
             }
-
-        } catch (Exception e) {
-            System.err.println("❗ Ошибка выполнения: " + e.getMessage());
-            e.printStackTrace();
-            System.exit(1);
+        } catch (IOException e) {
+            throw new RuntimeException("Не удалось создать директорию или файл: " + dataFile, e);
         }
     }
 
-    private static void printUsage() {
-        System.out.println("\nИспользование:");
-        System.out.println("  --cmd=add   --text=\"текст\"     → добавить");
-        System.out.println("  --cmd=rm    --id=N              → удалить по ID");
-        System.out.println("  --cmd=count                      → посчитать");
-        System.out.println("  --cmd=list                       → показать все");
+    public long addNote(String text) throws IOException {
+        lock.lock();
+        try {
+            List<String> lines = Files.exists(dataFile) ? Files.readAllLines(dataFile) : new ArrayList<>();
+            long newId = lines.isEmpty() ? 1 : parseId(lines.get(lines.size() - 1)) + 1;
+            String newLine = newId + "," + escapeCsv(text);
+            Files.write(dataFile, (newLine + System.lineSeparator()).getBytes(),
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            return newId;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public boolean removeNote(long idToRemove) throws IOException {
+        lock.lock();
+        try {
+            if (!Files.exists(dataFile)) return false;
+
+            List<String> lines = Files.readAllLines(dataFile);
+            boolean found = false;
+            List<String> updated = new ArrayList<>();
+
+            for (String line : lines) {
+                if (line.trim().isEmpty()) continue;
+                long id = parseId(line);
+                if (id == idToRemove) {
+                    found = true;
+                    continue;
+                }
+                updated.add(line);
+            }
+
+            if (found) {
+                Files.write(dataFile, updated);
+            }
+            return found;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public long countNotes() throws IOException {
+        if (!Files.exists(dataFile)) return 0;
+        try (var linesStream = Files.lines(dataFile)) {
+            return linesStream.filter(line -> !line.trim().isEmpty()).count();
+        }
+    }
+
+    public List<String> listNotes() throws IOException {
+        List<String> notes = new ArrayList<>();
+        if (!Files.exists(dataFile)) return notes;
+
+        List<String> lines = Files.readAllLines(dataFile);
+        for (String line : lines) {
+            line = line.trim();
+            if (line.isEmpty()) continue;
+            int comma = line.indexOf(',');
+            if (comma == -1) continue;
+            String id = line.substring(0, comma).trim();
+            String text = unescapeCsv(line.substring(comma + 1));
+            notes.add(id + ": " + text);
+        }
+        return notes;
+    }
+
+    // --- Вспомогательные методы ---
+
+    private long parseId(String line) {
+        int comma = line.indexOf(',');
+        if (comma == -1) return -1;
+        try {
+            return Long.parseLong(line.substring(0, comma).trim());
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    private String escapeCsv(String s) {
+        if (s == null) return "";
+        s = s.replace("\"", "\"\"");
+        if (s.contains(",") || s.contains("\"") || s.contains("\n")) {
+            s = "\"" + s + "\"";
+        }
+        return s;
+    }
+
+    private String unescapeCsv(String s) {
+        s = s.trim();
+        if (s.startsWith("\"") && s.endsWith("\"")) {
+            s = s.substring(1, s.length() - 1).replace("\"\"", "\"");
+        }
+        return s;
     }
 }
