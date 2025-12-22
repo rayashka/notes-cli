@@ -1,69 +1,99 @@
 package com.example;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 public class App {
     public static void main(String[] args) {
-        if (args.length == 0) {
-            System.out.println("Используйте: --cmd=<add|list|rm|count> [--text=\"текст\"] [--id=<номер>]");
-            return;
+        String cmd = null;
+        String text = null;
+        String idStr = null;
+
+        for (String arg : args) {
+            if (arg.startsWith("--cmd=")) {
+                cmd = arg.substring(6);
+            } else if (arg.startsWith("--text=")) {
+                text = arg.substring(7);
+            } else if (arg.startsWith("--id=")) {
+                idStr = arg.substring(5);
+            }
         }
 
-        Map<String, String> params = parseArgs(args);
-        String cmd = params.get("cmd");
-
-        NotesStore store = new NotesStore();
+        String dataPath = "/app/data/notes.csv";
+        NotesStore store = new NotesStore(dataPath);
 
         try {
+            if (cmd == null) {
+                System.err.println("❌ Ошибка: не указана команда (--cmd=add|rm|count|list)");
+                printUsage();
+                System.exit(1);
+            }
+
             switch (cmd) {
                 case "add":
-                    String text = params.get("text");
-                    if (text == null || text.isEmpty()) {
-                        System.out.println("Ошибка: не указан текст заметки");
-                        return;
+                    if (text == null) {
+                        System.err.println("❌ Ошибка: для --cmd=add требуется --text=\"...\"");
+                        printUsage();
+                        System.exit(1);
                     }
-                    store.addNote(text);
+                    long id = store.addNote(text);
+                    System.out.println("✅ Добавлена заметка #" + id);
                     break;
-                case "list":
-                    store.listNotes();
-                    break;
+
                 case "rm":
-                    String idStr = params.get("id");
-                    if (idStr == null || idStr.isEmpty()) {
-                        System.out.println("Ошибка: не указан ID");
-                        return;
+                    if (idStr == null) {
+                        System.err.println("❌ Ошибка: для --cmd=rm требуется --id=N");
+                        printUsage();
+                        System.exit(1);
                     }
-                    int id = Integer.parseInt(idStr);
-                    store.removeNote(id);
+                    try {
+                        long idToRemove = Long.parseLong(idStr);
+                        boolean removed = store.removeNote(idToRemove);
+                        if (removed) {
+                            System.out.println("🗑️ Заметка #" + idToRemove + " удалена");
+                        } else {
+                            System.out.println("⚠️ Заметка #" + idToRemove + " не найдена");
+                        }
+                    } catch (NumberFormatException e) {
+                        System.err.println("❌ Ошибка: --id должен быть целым числом");
+                        System.exit(1);
+                    }
                     break;
+
                 case "count":
-                    int count = store.countNotes();
-                    System.out.println(count);
+                    long count = store.countNotes();
+                    System.out.println("📊 Всего заметок: " + count);
                     break;
+
+                case "list":
+                    List<String> notes = store.listNotes();
+                    if (notes.isEmpty()) {
+                        System.out.println("📭 Нет заметок");
+                    } else {
+                        System.out.println("📋 Список заметок:");
+                        for (String note : notes) {
+                            System.out.println("  • " + note);
+                        }
+                    }
+                    break;
+
                 default:
-                    System.out.println("Неизвестная команда: " + cmd);
+                    System.err.println("❌ Неизвестная команда: " + cmd);
+                    printUsage();
+                    System.exit(1);
             }
-        } catch (IOException e) {
-            System.err.println("Ошибка ввода-вывода: " + e.getMessage());
-        } catch (NumberFormatException e) {
-            System.err.println("Ошибка: ID должен быть числом");
+
+        } catch (Exception e) {
+            System.err.println("❗ Ошибка выполнения: " + e.getMessage());
+            e.printStackTrace();
+            System.exit(1);
         }
     }
 
-    private static Map<String, String> parseArgs(String[] args) {
-        Map<String, String> params = new HashMap<>();
-        for (String arg : args) {
-            if (arg.startsWith("--")) {
-                String[] parts = arg.substring(2).split("=", 2);
-                if (parts.length == 2) {
-                    params.put(parts[0], parts[1].replaceAll("^\"|\"$", ""));
-                } else {
-                    params.put(parts[0], "");
-                }
-            }
-        }
-        return params;
+    private static void printUsage() {
+        System.out.println("\nИспользование:");
+        System.out.println("  --cmd=add   --text=\"текст\"     → добавить");
+        System.out.println("  --cmd=rm    --id=N              → удалить по ID");
+        System.out.println("  --cmd=count                      → посчитать");
+        System.out.println("  --cmd=list                       → показать все");
     }
 }
