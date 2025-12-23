@@ -18,7 +18,7 @@ public class App {
             }
         }
 
-        String dataPath = "/app/data/notes.csv";
+        String filePath = "data/notes.csv";
         NotesStore store = new NotesStore(dataPath);
 
         try {
