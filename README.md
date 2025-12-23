@@ -7,19 +7,19 @@
 
 ## Команды запуска
 
-### Локально (без Docker):
+### Запуск в Docker:
 
 # Компиляция
-javac src/com/example/*.java
+docker build -t notes-cli .
 
 # Добавление заметки
-java -cp src com.example.App --cmd=add --text="Купить хлеб"
+docker run -v notes-data:/app/data notes-cli --cmd=add --text="Моя первая заметка"
 
 # Просмотр всех заметок
-java -cp src com.example.App --cmd=list
+docker run -v notes-data:/app/data notes-cli --cmd=list
 
 # Удаление заметки по ID
-java -cp src com.example.App --cmd=rm --id=1
+docker run -v notes-data:/app/data notes-cli --cmd=rm --id=1
 
 # Подсчет заметок
-java -cp src com.example.App --cmd=count
+docker run -v notes-data:/app/data notes-cli --cmd=count
